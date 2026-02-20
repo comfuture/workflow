@@ -216,23 +216,15 @@ export async function onboardUser(userId: string) {
 
 With direct await, the parent workflow waits for the child to complete before continuing. The child's steps appear in the parent's event log as if they were called directly from the parent.
 
-### Background Execution via Step
+### Background Execution
 
-To run a child workflow independently without blocking the parent, use a step that calls [`start()`](/docs/api-reference/workflow-api/start). This launches the child workflow in the background.
+To run a child workflow independently without blocking the parent, use [`start()`](/docs/api-reference/workflow-api/start) directly in your workflow function. This launches the child workflow in the background.
 
 ```typescript lineNumbers
 import { start } from "workflow/api";
 declare function generateReport(reportId: string): Promise<void>; // @setup
 declare function fulfillOrder(orderId: string): Promise<{ id: string }>; // @setup
 declare function sendConfirmation(orderId: string): Promise<void>; // @setup
-
-// Step that starts a workflow in the background
-async function triggerReportGeneration(reportId: string) {
-  "use step";
-
-  const run = await start(generateReport, [reportId]); // [!code highlight]
-  return run.runId;
-}
 
 // Parent workflow
 export async function processOrder(orderId: string) {
@@ -241,16 +233,20 @@ export async function processOrder(orderId: string) {
   const order = await fulfillOrder(orderId);
 
   // Fire off report generation without waiting
-  const reportRunId = await triggerReportGeneration(orderId); // [!code highlight]
+  const reportRun = await start(generateReport, [orderId]); // [!code highlight]
 
   // Continue immediately - report generates in background
   await sendConfirmation(orderId);
 
-  return { orderId, reportRunId };
+  return { orderId, reportRunId: reportRun.runId };
 }
 ```
 
 With background execution, the parent workflow continues immediately after starting the child. The child workflow runs independently with its own event log and can be monitored separately using the returned `runId`.
+
+<Callout type="info">
+Inside workflow functions, `start()` returns an object with a `runId` property. For full `Run` capabilities (like `.returnValue` or `.cancel()`), use `getRun(runId)` inside a step function.
+</Callout>
 
 **Choose direct await when:**
 - The parent needs the child's result before continuing

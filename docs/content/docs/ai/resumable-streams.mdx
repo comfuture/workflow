@@ -161,8 +161,43 @@ Now try the flight booking example again. Open it up in a separate tab, or spam 
 
 This approach also handles page refreshes, as the client will automatically reconnect to the stream from the last known position when the UI loads with a stored run ID, following the behavior of [AI SDK's stream resumption](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-resume-streams#chatbot-resume-streams).
 
+## Common gotchas
+
+<Callout type="warn">
+**Request body customization**
+
+`WorkflowChatTransport` shapes its POST body differently than the default AI SDK transport. If you need custom fields in the request body (such as a model selector, temperature, or session metadata), use the `prepareSendMessagesRequest` hook to override the request:
+
+```typescript
+new WorkflowChatTransport({
+  prepareSendMessagesRequest: async (config) => ({
+    ...config,
+    body: JSON.stringify({
+      ...JSON.parse(config.body as string),
+      model: "gpt-4o",
+      temperature: 0.7,
+    }),
+  }),
+})
+```
+</Callout>
+
+<Callout type="info">
+**Debugging reconnection locally**
+
+If reconnection is not working as expected, open the [Workflow Web UI](/docs/observability) to inspect the run state:
+
+```bash
+npx workflow inspect runs --web
+```
+
+Check that the run is still active and that the `startIndex` in the reconnection request matches the last chunk the client received. The Web UI shows the full step trace, including stream chunk counts.
+</Callout>
+
 ## Related Documentation
 
+- [Migrate from Ephemeral to Durable Streaming](/docs/foundations/migrate-ephemeral-streaming) - Step-by-step migration guide
 - [`WorkflowChatTransport` API Reference](/docs/api-reference/workflow-ai/workflow-chat-transport) - Full configuration options
 - [Streaming](/docs/foundations/streaming) - Understanding workflow streams
 - [`getRun()` API Reference](/docs/api-reference/workflow-api/get-run) - Retrieving existing runs
+- [FAQ](/docs/faq) - Common troubleshooting questions

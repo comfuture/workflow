@@ -242,10 +242,10 @@ export async function processOrder(orderId: string) {
 }
 ```
 
-With background execution, the parent workflow continues immediately after starting the child. The child workflow runs independently with its own event log and can be monitored separately using the returned `runId`.
+With background execution, the parent workflow continues immediately after starting the child. The child workflow runs independently with its own event log and can be monitored separately using the returned `Run` object.
 
 <Callout type="info">
-Inside workflow functions, `start()` returns an object with a `runId` property. For full `Run` capabilities (like `.returnValue` or `.cancel()`), use `getRun(runId)` inside a step function.
+Inside workflow functions, `start()` returns a full `Run` object. You can access `.runId`, `.status`, `.returnValue`, `.cancel()`, and other `Run` properties — each access executes as a separate step.
 </Callout>
 
 **Choose direct await when:**

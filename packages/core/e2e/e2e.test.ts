@@ -848,6 +848,7 @@ describe('e2e', () => {
             expect(WorkflowRunFailedError.is(error)).toBe(true);
             assert(WorkflowRunFailedError.is(error));
             expect(error.cause.message).toContain('Nested workflow error');
+            expect(error.cause.code).toBe('USER_ERROR');
 
             // Workflow source maps are not properly supported everywhere. Check the definition
             // of hasWorkflowSourceMaps() to see where they are supported
@@ -861,8 +862,11 @@ describe('e2e', () => {
               expect(error.cause.stack).not.toContain('evalmachine');
             }
 
-            const { json: runData } = await cliInspectJson(`runs ${run.runId}`);
+            const { json: runData } = await cliInspectJson(
+              `runs ${run.runId} --withData`
+            );
             expect(runData.status).toBe('failed');
+            expect(runData.error.code).toBe('USER_ERROR');
           }
         );
 
@@ -1035,6 +1039,7 @@ describe('e2e', () => {
           expect(WorkflowRunFailedError.is(error)).toBe(true);
           assert(WorkflowRunFailedError.is(error));
           expect(error.cause.message).toContain('Fatal step error');
+          expect(error.cause.code).toBe('USER_ERROR');
 
           const { json: steps } = await cliInspectJson(
             `steps --runId ${run.runId}`
@@ -1066,6 +1071,20 @@ describe('e2e', () => {
         expect(result.failed).toBe(true);
         expect(result.attempt).toBe(1);
       });
+
+      test(
+        'infrastructure error on run_completed retries via queue (not run_failed)',
+        { timeout: 180_000 },
+        async () => {
+          const run = await start(await e2e('infraErrorRetryWorkflow'), [42]);
+          const result = await run.returnValue;
+
+          expect(result).toBe(84); // 42 * 2
+
+          const { json: runData } = await cliInspectJson(`runs ${run.runId}`);
+          expect(runData.status).toBe('completed');
+        }
+      );
     });
 
     describe('catchability', () => {

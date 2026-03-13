@@ -248,18 +248,16 @@ export function createQueue(config: Partial<Config>): LocalQueue {
             continue;
           }
 
-          console.error(`[local world] Failed to queue message`, {
-            queueName,
-            text: result.text,
-            status: result.status,
-            headers: result.headers,
-            body: body.toString(),
-          });
+          console.error(
+            `[world-local] Queue message failed (attempt ${attempt + 1}/${attempt + 1 + defaultRetriesLeft}, status ${result.status}): ${result.text}`,
+            { queueName, messageId }
+          );
         }
 
-        console.error(
-          `[local world] Reached max retries of local world queue implementation`
-        );
+        console.error(`[world-local] Queue message exhausted all retries`, {
+          queueName,
+          messageId,
+        });
       } finally {
         semaphore.release();
       }

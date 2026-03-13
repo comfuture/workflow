@@ -294,7 +294,7 @@ export async function makeRequest<T>({
           await parseResponseBody(response)
             .then((r) => r.data as { message?: string; code?: string })
             .catch(() => ({}));
-        if (process.env.DEBUG === '1') {
+        if (process.env.DEBUG) {
           const stringifiedHeaders = Array.from(headers.entries())
             .map(([key, value]: [string, string]) => `-H "${key}: ${value}"`)
             .join(' ');
@@ -358,8 +358,14 @@ export async function makeRequest<T>({
       const result = await trace('world.validate', async () => {
         const validationResult = schema.safeParse(parseResult.data);
         if (!validationResult.success) {
+          const issues = validationResult.error.issues
+            .map((i) => `  ${i.path.join('.')}: ${i.message}`)
+            .join('\n');
+          const debugContext = process.env.DEBUG
+            ? `\n\nResponse context: ${parseResult.getDebugContext()}`
+            : '';
           throw new WorkflowAPIError(
-            `Schema validation failed for ${method} ${endpoint}:\n\n${validationResult.error}\n\nResponse context: ${parseResult.getDebugContext()}`,
+            `Schema validation failed for ${method} ${endpoint}:\n${issues}${debugContext}`,
             { url, cause: validationResult.error }
           );
         }

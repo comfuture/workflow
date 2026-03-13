@@ -1400,3 +1400,94 @@ export async function sleepWithSequentialStepsWorkflow() {
   const c = await addNumbers(b, 4);
   return { a, b, c, shouldCancel };
 }
+
+// ============================================================
+// Infrastructure error retry via queue redelivery
+// ============================================================
+
+async function doWorkForInfraTest(input: number) {
+  'use step';
+  return input * 2;
+}
+
+const INFRA_FAULT_MAP_SYMBOL = Symbol.for('__wkf_infra_fault_map__');
+const INFRA_FAULT_WRAPPER_SYMBOL = Symbol.for('__wkf_infra_fault_wrapper__');
+
+type InfraFaultState = {
+  remaining: number;
+  triggered: number;
+};
+
+/**
+ * Step that installs a fault injection patch on world.events.create,
+ * targeting run_completed events for the current runId.
+ */
+async function installRunCompletedFaultInjection(failCount: number) {
+  'use step';
+  const { workflowRunId } = getWorkflowMetadata();
+  const world = (globalThis as any)[Symbol.for('@workflow/world//cache')];
+
+  (globalThis as any)[INFRA_FAULT_MAP_SYMBOL] ??= new Map<
+    string,
+    InfraFaultState
+  >();
+  const faultMap = (globalThis as any)[INFRA_FAULT_MAP_SYMBOL] as Map<
+    string,
+    InfraFaultState
+  >;
+
+  faultMap.set(workflowRunId, { remaining: failCount, triggered: 0 });
+
+  if (!(world.events.create as any)[INFRA_FAULT_WRAPPER_SYMBOL]) {
+    const original =
+      (world.events.create as any).__original ?? world.events.create;
+    const bound = original.bind(world.events);
+
+    const wrappedCreate = async (
+      rid: string,
+      data: any,
+      ...rest: any[]
+    ): Promise<any> => {
+      const state = faultMap.get(rid);
+      if (state && data?.eventType === 'run_completed' && state.remaining > 0) {
+        state.remaining--;
+        state.triggered++;
+        const err: any = new Error('Injected 5xx on run_completed');
+        err.name = 'WorkflowAPIError';
+        err.status = 500;
+        throw err;
+      }
+      return bound(rid, data, ...rest);
+    };
+
+    (wrappedCreate as any)[INFRA_FAULT_WRAPPER_SYMBOL] = true;
+    (wrappedCreate as any).__original = original;
+    world.events.create = wrappedCreate;
+  }
+}
+
+async function cleanupInfraFaultInjection() {
+  'use step';
+  const { workflowRunId } = getWorkflowMetadata();
+  const faultMap = (globalThis as any)[INFRA_FAULT_MAP_SYMBOL] as
+    | Map<string, InfraFaultState>
+    | undefined;
+  const state = faultMap?.get(workflowRunId);
+  const triggered = state?.triggered ?? 0;
+  faultMap?.delete(workflowRunId);
+  return triggered;
+}
+
+/**
+ * Workflow that exercises infrastructure error retry via queue redelivery.
+ * After PR #1339, run_completed errors propagate to the queue handler
+ * (not caught by the run_failed try/catch), so the message is redelivered
+ * and the workflow eventually completes successfully.
+ */
+export async function infraErrorRetryWorkflow(input: number) {
+  'use workflow';
+  await installRunCompletedFaultInjection(2);
+  const result = await doWorkForInfraTest(input);
+  await cleanupInfraFaultInjection();
+  return result;
+}

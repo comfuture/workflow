@@ -1,4 +1,5 @@
 import { WorkflowAPIError, WorkflowRuntimeError } from '@workflow/errors';
+import { classifyRunError } from './classify-error.js';
 import { parseWorkflowName } from '@workflow/utils/parse-name';
 import {
   type Event,
@@ -344,8 +345,14 @@ export function workflowEntrypoint(
                     );
                   }
 
+                  // Classify the error: WorkflowRuntimeError indicates an
+                  // internal issue (corrupted event log, missing data);
+                  // everything else is a user code error.
+                  const errorCode = classifyRunError(err);
+
                   runtimeLogger.error('Error while running workflow', {
                     workflowRunId: runId,
+                    errorCode,
                     errorName,
                     errorStack,
                   });
@@ -360,7 +367,7 @@ export function workflowEntrypoint(
                           message: errorMessage,
                           stack: errorStack,
                         },
-                        // TODO: include error codes when we define them
+                        errorCode,
                       },
                     });
                   } catch (failErr) {

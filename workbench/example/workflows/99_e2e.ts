@@ -1442,7 +1442,7 @@ export async function startFromWorkflow(inputValue: number) {
 
   return {
     parentInput: inputValue,
-    childRunId: childRun.runId,
+    childRun,
     signalFromChild: signal,
   };
 }

@@ -1,6 +1,6 @@
 import type { Span } from '@opentelemetry/api';
 import { waitUntil } from '@vercel/functions';
-import { WorkflowAPIError } from '@workflow/errors';
+import { EntityConflictError, RunExpiredError, WorkflowAPIError } from '@workflow/errors';
 import {
   type CreateEventRequest,
   type SerializedData,
@@ -133,18 +133,14 @@ export async function handleSuspension({
             hasHookConflict = true;
           }
         } catch (err) {
-          if (WorkflowAPIError.is(err)) {
-            if (err.status === 410) {
-              runtimeLogger.info(
-                'Workflow run already completed, skipping hook',
-                {
-                  workflowRunId: runId,
-                  message: err.message,
-                }
-              );
-            } else {
-              throw err;
-            }
+          if (RunExpiredError.is(err)) {
+            runtimeLogger.info(
+              'Workflow run already completed, skipping hook',
+              {
+                workflowRunId: runId,
+                message: err.message,
+              }
+            );
           } else {
             throw err;
           }
@@ -165,26 +161,22 @@ export async function handleSuspension({
         try {
           await world.events.create(runId, hookDisposedEvent);
         } catch (err) {
-          if (WorkflowAPIError.is(err)) {
-            if (err.status === 410) {
-              runtimeLogger.info(
-                'Workflow run already completed, skipping hook disposal',
-                {
-                  workflowRunId: runId,
-                  correlationId: queueItem.correlationId,
-                  message: err.message,
-                }
-              );
-            } else if (err.status === 404) {
-              // Hook may have already been disposed or never created
-              runtimeLogger.info('Hook not found for disposal, continuing', {
+          if (RunExpiredError.is(err)) {
+            runtimeLogger.info(
+              'Workflow run already completed, skipping hook disposal',
+              {
                 workflowRunId: runId,
                 correlationId: queueItem.correlationId,
                 message: err.message,
-              });
-            } else {
-              throw err;
-            }
+              }
+            );
+          } else if (WorkflowAPIError.is(err) && err.status === 404) {
+            // Hook may have already been disposed or never created
+            runtimeLogger.info('Hook not found for disposal, continuing', {
+              workflowRunId: runId,
+              correlationId: queueItem.correlationId,
+              message: err.message,
+            });
           } else {
             throw err;
           }
@@ -233,7 +225,7 @@ export async function handleSuspension({
           try {
             await world.events.create(runId, stepEvent);
           } catch (err) {
-            if (WorkflowAPIError.is(err) && err.status === 409) {
+            if (EntityConflictError.is(err)) {
               runtimeLogger.info('Step already exists, continuing', {
                 workflowRunId: runId,
                 correlationId: queueItem.correlationId,
@@ -288,7 +280,7 @@ export async function handleSuspension({
           try {
             await world.events.create(runId, waitEvent);
           } catch (err) {
-            if (WorkflowAPIError.is(err) && err.status === 409) {
+            if (EntityConflictError.is(err)) {
               runtimeLogger.info('Wait already exists, continuing', {
                 workflowRunId: runId,
                 correlationId: queueItem.correlationId,

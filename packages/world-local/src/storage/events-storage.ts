@@ -1,5 +1,10 @@
 import path from 'node:path';
-import { RunNotSupportedError, WorkflowAPIError } from '@workflow/errors';
+import {
+  EntityConflictError,
+  RunExpiredError,
+  RunNotSupportedError,
+  WorkflowAPIError,
+} from '@workflow/errors';
 import type {
   Event,
   EventResult,
@@ -178,9 +183,8 @@ export function createEventsStorage(basedir: string): Storage['events'] {
           runTerminalEvents.includes(data.eventType) ||
           data.eventType === 'run_cancelled'
         ) {
-          throw new WorkflowAPIError(
-            `Cannot transition run from terminal state "${currentRun.status}"`,
-            { status: 409 }
+          throw new EntityConflictError(
+            `Cannot transition run from terminal state "${currentRun.status}"`
           );
         }
 
@@ -190,9 +194,8 @@ export function createEventsStorage(basedir: string): Storage['events'] {
           data.eventType === 'hook_created' ||
           data.eventType === 'wait_created'
         ) {
-          throw new WorkflowAPIError(
-            `Cannot create new entities on run in terminal state "${currentRun.status}"`,
-            { status: 409 }
+          throw new EntityConflictError(
+            `Cannot create new entities on run in terminal state "${currentRun.status}"`
           );
         }
       }
@@ -224,18 +227,16 @@ export function createEventsStorage(basedir: string): Storage['events'] {
 
         // Step terminal state validation
         if (isStepTerminal(validatedStep.status)) {
-          throw new WorkflowAPIError(
-            `Cannot modify step in terminal state "${validatedStep.status}"`,
-            { status: 409 }
+          throw new EntityConflictError(
+            `Cannot modify step in terminal state "${validatedStep.status}"`
           );
         }
 
         // On terminal runs: only allow completing/failing in-progress steps
         if (currentRun && isRunTerminal(currentRun.status)) {
           if (validatedStep.status !== 'running') {
-            throw new WorkflowAPIError(
-              `Cannot modify non-running step on run in terminal state "${currentRun.status}"`,
-              { status: 410 }
+            throw new RunExpiredError(
+              `Cannot modify non-running step on run in terminal state "${currentRun.status}"`
             );
           }
         }
@@ -683,9 +684,8 @@ export function createEventsStorage(basedir: string): Storage['events'] {
         );
         const existingWait = await readJSON(waitPath, WaitSchema);
         if (existingWait) {
-          throw new WorkflowAPIError(
-            `Wait "${data.correlationId}" already exists`,
-            { status: 409 }
+          throw new EntityConflictError(
+            `Wait "${data.correlationId}" already exists`
           );
         }
         wait = {
@@ -714,9 +714,8 @@ export function createEventsStorage(basedir: string): Storage['events'] {
           });
         }
         if (existingWait.status === 'completed') {
-          throw new WorkflowAPIError(
-            `Wait "${data.correlationId}" already completed`,
-            { status: 409 }
+          throw new EntityConflictError(
+            `Wait "${data.correlationId}" already completed`
           );
         }
         wait = {

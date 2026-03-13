@@ -40,6 +40,7 @@ import {
   queueMessage,
   withHealthCheck,
 } from './helpers.js';
+import { MAX_QUEUE_DELIVERIES } from './constants.js';
 import { getWorld, getWorldHandlers } from './world.js';
 
 const DEFAULT_STEP_MAX_RETRIES = 3;
@@ -65,6 +66,52 @@ const stepHandler = getWorldHandlers().createQueueHandler(
       traceCarrier: traceContext,
       requestedAt,
     } = StepInvokePayloadSchema.parse(message_);
+
+    // --- Max delivery check ---
+    // Enforce max delivery limit before any infrastructure calls.
+    // This prevents runaway steps from consuming infinite queue deliveries.
+    if (metadata.attempt > MAX_QUEUE_DELIVERIES) {
+      runtimeLogger.error(
+        `Step handler exceeded max deliveries (${metadata.attempt}/${MAX_QUEUE_DELIVERIES})`,
+        { workflowRunId, stepId, stepName: metadata.queueName.slice('__wkf_step_'.length), attempt: metadata.attempt }
+      );
+      try {
+        const world = getWorld();
+        await world.events.create(workflowRunId, {
+          eventType: 'step_failed',
+          specVersion: SPEC_VERSION_CURRENT,
+          correlationId: stepId,
+          eventData: {
+            error: `Step exceeded maximum queue deliveries (${metadata.attempt}/${MAX_QUEUE_DELIVERIES})`,
+          },
+        });
+        // Re-queue the workflow to handle the failed step
+        await queueMessage(world, getWorkflowQueueName(workflowName), {
+          runId: workflowRunId,
+          traceCarrier: await serializeTraceCarrier(),
+          requestedAt: new Date(),
+        });
+      } catch (err) {
+        if (
+          EntityConflictError.is(err) ||
+          RunExpiredError.is(err)
+        ) {
+          // Step/run already finished, consume the message
+          return;
+        }
+        runtimeLogger.error(
+          'Failed to post step_failed for max deliveries exceeded, consuming message anyway',
+          {
+            workflowRunId,
+            stepId,
+            error: err instanceof Error ? err.message : String(err),
+            attempt: metadata.attempt,
+          }
+        );
+      }
+      return;
+    }
+
     const spanLinks = await linkToCurrentContext();
     // Execute step within the propagated trace context
     return await withTraceContext(traceContext, async () => {

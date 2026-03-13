@@ -216,11 +216,12 @@ export function createQueue(config: Partial<Config>): LocalQueue {
         );
         await semaphore.acquire();
       }
-      try {
-        let defaultRetriesLeft = 3;
-        for (let attempt = 0; defaultRetriesLeft > 0; attempt++) {
-          defaultRetriesLeft--;
+      // Safety limit to prevent infinite loops in the local queue.
+      // The actual max delivery enforcement happens in the workflow/step handlers.
+      const MAX_LOCAL_SAFETY_LIMIT = 1000;
 
+      try {
+        for (let attempt = 0; attempt < MAX_LOCAL_SAFETY_LIMIT; attempt++) {
           const result = await executor.executeMessage({
             queueName,
             messageId,
@@ -244,20 +245,16 @@ export function createQueue(config: Partial<Config>): LocalQueue {
               );
               await setTimeout(timeoutMs);
             }
-            defaultRetriesLeft++;
             continue;
           }
 
           console.error(
-            `[world-local] Queue message failed (attempt ${attempt + 1}/${attempt + 1 + defaultRetriesLeft}, status ${result.status}): ${result.text}`,
+            `[world-local] Queue message failed (attempt ${attempt + 1}, status ${result.status}): ${result.text}`,
             { queueName, messageId }
           );
+          // On error, break out of the loop (don't retry)
+          break;
         }
-
-        console.error(`[world-local] Queue message exhausted all retries`, {
-          queueName,
-          messageId,
-        });
       } finally {
         semaphore.release();
       }

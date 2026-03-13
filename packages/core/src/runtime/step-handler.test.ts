@@ -446,3 +446,77 @@ describe('step-handler 409 handling', () => {
     });
   });
 });
+
+describe('step-handler max deliveries', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getStepFunction).mockReturnValue(mockStepFn);
+    mockStepFn.mockReset().mockResolvedValue('step-result');
+    mockStepFn.maxRetries = 3;
+    mockQueueMessage.mockResolvedValue(undefined);
+    vi.mocked(getWorld).mockReturnValue({
+      events: { create: mockEventsCreate },
+      queue: mockQueue,
+      getEncryptionKeyForRun: vi.fn().mockResolvedValue(undefined),
+    } as any);
+    mockEventsCreate.mockReset().mockResolvedValue({
+      step: {
+        stepId: 'step_abc',
+        status: 'running',
+        attempt: 1,
+        startedAt: new Date(),
+        input: [],
+      },
+      event: {},
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should post step_failed and re-queue workflow when delivery count exceeds max', async () => {
+    const result = await capturedHandler(
+      createMessage(),
+      { ...createMetadata('myStep'), attempt: 65 }
+    );
+
+    expect(result).toBeUndefined();
+    expect(mockEventsCreate).toHaveBeenCalledWith(
+      'wrun_test123',
+      expect.objectContaining({
+        eventType: 'step_failed',
+        correlationId: 'step_abc',
+      })
+    );
+    expect(mockQueueMessage).toHaveBeenCalled();
+    expect(mockRuntimeLogger.error).toHaveBeenCalledWith(
+      expect.stringContaining('exceeded max deliveries'),
+      expect.objectContaining({ workflowRunId: 'wrun_test123' })
+    );
+  });
+
+  it('should consume message silently when step_failed fails with EntityConflictError', async () => {
+    mockEventsCreate.mockRejectedValue(
+      new EntityConflictError('Step already completed')
+    );
+
+    const result = await capturedHandler(
+      createMessage(),
+      { ...createMetadata('myStep'), attempt: 65 }
+    );
+
+    expect(result).toBeUndefined();
+    expect(mockStepFn).not.toHaveBeenCalled();
+  });
+
+  it('should not trigger max deliveries check when under limit', async () => {
+    const result = await capturedHandler(
+      createMessage(),
+      { ...createMetadata('myStep'), attempt: 64 }
+    );
+
+    // Should proceed normally (step function executes)
+    expect(mockStepFn).toHaveBeenCalled();
+  });
+});

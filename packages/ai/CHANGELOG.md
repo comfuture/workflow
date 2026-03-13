@@ -1,5 +1,27 @@
 # @workflow/ai
 
+## 4.1.0-beta.57
+
+### Minor Changes
+
+- [#1362](https://github.com/vercel/workflow/pull/1362) [`74aea7b`](https://github.com/vercel/workflow/commit/74aea7b0af51a959b3e6efcc3c8e082ad14e86d4) Thanks [@pranaygp](https://github.com/pranaygp)! - **BREAKING CHANGE**: Migrate to AI SDK v6. Drop AI SDK v5 support.
+  - Migrate all types from V2 to V3 (`LanguageModelV2*` → `LanguageModelV3*`)
+  - Update peer dependency: `ai` `^5 || ^6` → `^6`, `@ai-sdk/provider` `^2 || ^3` → `^3`
+  - Simplify `CompatibleLanguageModel` from V2|V3 union to `LanguageModelV3`
+  - Remove `providerExecuted` guard on tool-result stream parts (V3: all tool-results are provider-executed)
+  - Add `instructions` constructor option (replaces deprecated `system`)
+  - Add `onStepFinish` and `onFinish` on constructor (merged with stream callbacks)
+  - Add `timeout` stream option
+  - Enrich `onFinish` event with `text`, `finishReason`, `totalUsage`
+  - Add `@workflow/ai/test` export with `mockTextModel` and `mockSequenceModel` for workflow e2e testing
+  - Update `OutputSpecification` to match AI SDK v6 Output interface
+  - Fix `WorkflowChatTransport` to forward `body` and `headers` from `ChatRequestOptions` to `prepareSendMessagesRequest` and the default request body
+
+### Patch Changes
+
+- Updated dependencies []:
+  - workflow@4.2.0-beta.71
+
 ## 4.0.1-beta.56
 
 ### Patch Changes

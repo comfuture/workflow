@@ -1,5 +1,12 @@
 # @workflow/rollup
 
+## 4.0.0-beta.28
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @workflow/builders@4.0.1-beta.62
+
 ## 4.0.0-beta.27
 
 ### Patch Changes

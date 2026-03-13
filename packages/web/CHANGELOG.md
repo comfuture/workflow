@@ -1,5 +1,12 @@
 # @workflow/web
 
+## 4.1.0-beta.43
+
+### Patch Changes
+
+- [#1381](https://github.com/vercel/workflow/pull/1381) [`7b9b3c1`](https://github.com/vercel/workflow/commit/7b9b3c1a484a4effff2190ac9899a2608704f375) Thanks [@karthikscale3](https://github.com/karthikscale3)! - web-shared: Timestamp tooltips, toast adapter, improved skeletons, and encrypted data detection for lazy-loaded events
+  web: Add toast for decryption
+
 ## 4.1.0-beta.42
 
 ### Patch Changes

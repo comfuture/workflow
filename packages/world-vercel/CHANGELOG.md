@@ -1,5 +1,13 @@
 # @workflow/world-vercel
 
+## 4.1.0-beta.44
+
+### Patch Changes
+
+- [#1378](https://github.com/vercel/workflow/pull/1378) [`d6e8727`](https://github.com/vercel/workflow/commit/d6e8727a948ce60d15af635763239d8321cd7cee) Thanks [@TooTallNate](https://github.com/TooTallNate)! - Reorder token resolution in `fetchRunKey` and `resolveLatestDeploymentId` to prefer `options.token` / `VERCEL_TOKEN` before calling OIDC, skipping the OIDC network call when a token is already available
+
+- [#1335](https://github.com/vercel/workflow/pull/1335) [`e902980`](https://github.com/vercel/workflow/commit/e9029807733d6a7dba76626ae61bd751e9a18fbe) Thanks [@VaguelySerious](https://github.com/VaguelySerious)! - Use undici dispatcher for queue client
+
 ## 4.1.0-beta.43
 
 ### Patch Changes

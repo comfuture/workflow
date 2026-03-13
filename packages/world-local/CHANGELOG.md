@@ -1,5 +1,11 @@
 # @workflow/world-local
 
+## 4.1.0-beta.44
+
+### Patch Changes
+
+- [#1359](https://github.com/vercel/workflow/pull/1359) [`0f07403`](https://github.com/vercel/workflow/commit/0f074030a408078e7db0ae0e494f64125d7444e4) Thanks [@VaguelySerious](https://github.com/VaguelySerious)! - Write workflow data for vitest to the same folder as other local world runs, allowing them to be visible in observability tooling. Use a suffix-based system to ensure clearing runs on test start only affects vitest-related data.
+
 ## 4.1.0-beta.43
 
 ### Patch Changes
